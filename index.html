@@ -690,64 +690,123 @@ function renderRec() {
 
 // ── PICTURE-IN-PICTURE (항상 최상단 미니창) ─────────────────
 var pipWin = null;
-var pipIv = null;
+var pipIv  = null;
 
 function togglePiP() {
   if (pipWin && !pipWin.closed) {
-    pipWin.close();
-    pipWin = null;
+    pipWin.close(); pipWin = null;
     clearInterval(pipIv);
     el('pip-btn').textContent = '미니창';
     return;
   }
-  // Document PiP API (Chrome 116+)
-  if ('documentPictureInPicture' in window) {
-    window.documentPictureInPicture.requestWindow({ width:200, height:160 }).then(function(w) {
-      pipWin = w;
-      el('pip-btn').textContent = '미니창 닫기';
-      // inject styles
-      var style = w.document.createElement('style');
-      style.textContent = [
-        '*{margin:0;padding:0;box-sizing:border-box}',
-        'body{background:#F7F4EE;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-family:-apple-system,sans-serif;gap:6px}',
-        '#pt{font-size:52px;font-weight:200;letter-spacing:-2px;font-variant-numeric:tabular-nums;color:#1C1916;transition:color .4s;line-height:1}',
-        '#pp{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#B5B0A4}',
-        'body.w1{background:#FDF0EE}',
-        'body.w2{background:#FAE4E0;animation:bl 1s ease-in-out infinite}',
-        'body.w3{background:#F8D8D2;animation:bl .4s ease-in-out infinite}',
-        '@keyframes bl{0%,100%{opacity:1}50%{opacity:.6}}',
-        '@keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}',
-        '.shaking{animation:sh .08s ease-in-out infinite}'
-      ].join('');
-      w.document.head.appendChild(style);
-      var ph = w.document.createElement('div'); ph.id = 'pp'; ph.textContent = '준비';
-      var td = w.document.createElement('div'); td.id = 'pt'; td.textContent = el('tdisp').textContent;
-      w.document.body.appendChild(ph);
-      w.document.body.appendChild(td);
-      // sync loop
-      pipIv = setInterval(function() {
-        if (!pipWin || pipWin.closed) { clearInterval(pipIv); el('pip-btn').textContent = '미니창'; pipWin = null; return; }
-        var ptd = pipWin.document.getElementById('pt');
-        var pph = pipWin.document.getElementById('pp');
-        if (!ptd || !pph) return;
-        ptd.textContent = el('tdisp').textContent;
-        ptd.style.color  = el('tdisp').style.color || '#1C1916';
-        pph.textContent  = el('phase').textContent;
-        pph.style.color  = el('phase').style.color || '#B5B0A4';
-        // warning class sync
-        var b = pipWin.document.body;
-        b.classList.remove('w1','w2','w3');
-        ptd.classList.remove('shaking');
-        if (document.body.classList.contains('warn3')) { b.classList.add('w3'); ptd.classList.add('shaking'); }
-        else if (document.body.classList.contains('warn2')) b.classList.add('w2');
-        else if (document.body.classList.contains('warn1')) b.classList.add('w1');
-      }, 500);
-      w.addEventListener('pagehide', function() {
-        clearInterval(pipIv); pipWin = null; el('pip-btn').textContent = '미니창';
-      });
-    }).catch(function(e) { alert('미니창을 열 수 없어요.\n크롬 116 이상에서 지원됩니다.'); });
-  } else {
-    alert('이 브라우저는 미니창을 지원하지 않아요.\n크롬 116 이상을 사용해주세요.');
+  if (!('documentPictureInPicture' in window)) {
+    alert('이 브라우저는 미니창을 지원하지 않아요.\n크롬 116 이상을 사용해주세요.'); return;
+  }
+  window.documentPictureInPicture.requestWindow({ width:240, height:320 }).then(function(w) {
+    pipWin = w;
+    el('pip-btn').textContent = '미니창 닫기';
+
+    var style = w.document.createElement('style');
+    style.textContent = [
+      '*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}',
+      'body{background:#F7F4EE;display:flex;flex-direction:column;align-items:center;height:100%;font-family:-apple-system,sans-serif;padding:14px 16px;gap:0;transition:background .6s}',
+      '#pp{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#B5B0A4;margin-bottom:4px;height:14px;transition:color .3s}',
+      '#pt{font-size:54px;font-weight:200;letter-spacing:-2px;font-variant-numeric:tabular-nums;color:#1C1916;line-height:1;transition:color .4s}',
+      '#ps{font-size:11px;color:#B5B0A4;margin-top:4px;margin-bottom:10px}',
+      '.row{display:flex;gap:6px;width:100%;margin-bottom:8px}',
+      '.pb{flex:1;background:none;border:1px solid #C4BFB0;border-radius:7px;color:#7A756C;font-size:12px;padding:8px 4px;cursor:pointer;font-family:inherit;transition:all .15s;text-align:center}',
+      '.pb:hover{border-color:#3A3530;color:#1C1916}',
+      '.pb:active{opacity:.7}',
+      '.pb.gold{border-color:#9A6F38;color:#9A6F38}',
+      '.pb.gold:hover{background:rgba(154,111,56,.07)}',
+      '.pb.red{border-color:#C43030;color:#C43030}',
+      '.sep{width:100%;height:1px;background:#E8E4DC;margin-bottom:10px}',
+      '.slbl{display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:5px}',
+      '.sn{font-size:11px;color:#7A756C}',
+      '.sv{font-size:11px;font-weight:500;color:#3A3530}',
+      'input[type=range]{-webkit-appearance:none;width:100%;height:2px;background:#C4BFB0;border-radius:2px;outline:none;cursor:pointer;margin-bottom:10px}',
+      'input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#3A3530;cursor:pointer}',
+      'body.w1{background:#FDF0EE}',
+      'body.w2{background:#FAE4E0;animation:bl 1s ease-in-out infinite}',
+      'body.w3{background:#F8D8D2;animation:bl .4s ease-in-out infinite}',
+      '@keyframes bl{0%,100%{opacity:1}50%{opacity:.55}}',
+      '@keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}',
+      '.shaking{animation:sh .08s ease-in-out infinite}'
+    ].join('');
+    w.document.head.appendChild(style);
+
+    w.document.body.innerHTML = [
+      '<div id="pp">준비</div>',
+      '<div id="pt">'+el('tdisp').textContent+'</div>',
+      '<div id="ps">세션 1 / '+cfg.rep+'</div>',
+      '<div class="row">',
+        '<button class="pb gold" id="pbstart" onclick="window.opener && window.opener.doToggle()">시작</button>',
+        '<button class="pb red"  onclick="window.opener && window.opener.doReset()">초기화</button>',
+      '</div>',
+      '<div class="sep"></div>',
+      '<div class="slbl"><span class="sn">크로키 시간</span><span class="sv" id="pvd">'+fmtL(cfg.draw)+'</span></div>',
+      '<input type="range" id="psd" min="60" max="600" step="10" value="'+cfg.draw+'" oninput="window.opener&&window.opener.pipSetDraw(+this.value)">',
+      '<div class="slbl"><span class="sn">휴식 시간</span><span class="sv" id="pvr">'+( cfg.rest===0?'없음':cfg.rest+'초' )+'</span></div>',
+      '<input type="range" id="psr" min="0" max="30" step="5" value="'+cfg.rest+'" oninput="window.opener&&window.opener.pipSetRest(+this.value)">',
+      '<div class="slbl"><span class="sn">반복 횟수</span><span class="sv" id="pvn">'+cfg.rep+'회</span></div>',
+      '<input type="range" id="psn" min="1" max="10" step="1" value="'+cfg.rep+'" oninput="window.opener&&window.opener.pipSetRep(+this.value)">'
+    ].join('');
+
+    // sync loop
+    pipIv = setInterval(function() {
+      if (!pipWin || pipWin.closed) { clearInterval(pipIv); el('pip-btn').textContent='미니창'; pipWin=null; return; }
+      var wd = pipWin.document;
+      var ptd = wd.getElementById('pt'); if (!ptd) return;
+      ptd.textContent = el('tdisp').textContent;
+      ptd.style.color = el('tdisp').style.color || '#1C1916';
+      var pph = wd.getElementById('pp');
+      if (pph) { pph.textContent=el('phase').textContent; pph.style.color=el('phase').style.color||'#B5B0A4'; }
+      var pps = wd.getElementById('ps');
+      if (pps) pps.textContent = el('slbl').textContent;
+      var pbs = wd.getElementById('pbstart');
+      if (pbs) pbs.textContent = rt.running ? '일시정지' : (rt.phase==='idle'?'시작':'계속');
+      // settings sync from main → pip (if not dragging)
+      var psd=wd.getElementById('psd'), pvd=wd.getElementById('pvd');
+      if(psd&&pvd&&wd.activeElement!==psd){psd.value=cfg.draw;pvd.textContent=fmtL(cfg.draw);}
+      var psr=wd.getElementById('psr'), pvr=wd.getElementById('pvr');
+      if(psr&&pvr&&wd.activeElement!==psr){psr.value=cfg.rest;pvr.textContent=(cfg.rest===0?'없음':cfg.rest+'초');}
+      var psn=wd.getElementById('psn'), pvn=wd.getElementById('pvn');
+      if(psn&&pvn&&wd.activeElement!==psn){psn.value=cfg.rep;pvn.textContent=cfg.rep+'회';}
+      // warning
+      var b = pipWin.document.body;
+      b.classList.remove('w1','w2','w3'); ptd.classList.remove('shaking');
+      if (document.body.classList.contains('warn3')) { b.classList.add('w3'); ptd.classList.add('shaking'); }
+      else if (document.body.classList.contains('warn2')) b.classList.add('w2');
+      else if (document.body.classList.contains('warn1')) b.classList.add('w1');
+    }, 400);
+
+    w.addEventListener('pagehide', function() {
+      clearInterval(pipIv); pipWin=null; el('pip-btn').textContent='미니창';
+    });
+  }).catch(function() { alert('미니창을 열 수 없어요.\n크롬 116 이상에서 지원됩니다.'); });
+}
+
+// PiP slider callbacks (called from pip window via window.opener)
+function pipSetDraw(v) {
+  onDraw(v);
+  if (pipWin && !pipWin.closed) {
+    var wd = pipWin.document;
+    var pvd = wd.getElementById('pvd'); if(pvd) pvd.textContent = fmtL(v);
+    var psd = wd.getElementById('psd'); if(psd) psd.value = v;
+  }
+}
+function pipSetRest(v) {
+  onRest(v);
+  if (pipWin && !pipWin.closed) {
+    var wd = pipWin.document;
+    var pvr = wd.getElementById('pvr'); if(pvr) pvr.textContent = (v===0?'없음':v+'초');
+  }
+}
+function pipSetRep(v) {
+  onRep(v);
+  if (pipWin && !pipWin.closed) {
+    var wd = pipWin.document;
+    var pvn = wd.getElementById('pvn'); if(pvn) pvn.textContent = v+'회';
   }
 }
 
