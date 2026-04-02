@@ -141,7 +141,10 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; h
 
 <div class="hdr">
   <span class="logo">Croquis</span>
-  <button class="fs-btn" onclick="toggleFS()">전체화면</button>
+  <div style="display:flex;gap:6px">
+    <button class="fs-btn" id="pip-btn" onclick="togglePiP()">미니창</button>
+    <button class="fs-btn" onclick="toggleFS()">전체화면</button>
+  </div>
 </div>
 
 <div class="main">
@@ -683,6 +686,69 @@ function renderRec() {
     lw.textContent = days[(dn-6+i+7)%7];
     wl.appendChild(lw);
   });
+}
+
+// ── PICTURE-IN-PICTURE (항상 최상단 미니창) ─────────────────
+var pipWin = null;
+var pipIv = null;
+
+function togglePiP() {
+  if (pipWin && !pipWin.closed) {
+    pipWin.close();
+    pipWin = null;
+    clearInterval(pipIv);
+    el('pip-btn').textContent = '미니창';
+    return;
+  }
+  // Document PiP API (Chrome 116+)
+  if ('documentPictureInPicture' in window) {
+    window.documentPictureInPicture.requestWindow({ width:200, height:160 }).then(function(w) {
+      pipWin = w;
+      el('pip-btn').textContent = '미니창 닫기';
+      // inject styles
+      var style = w.document.createElement('style');
+      style.textContent = [
+        '*{margin:0;padding:0;box-sizing:border-box}',
+        'body{background:#F7F4EE;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-family:-apple-system,sans-serif;gap:6px}',
+        '#pt{font-size:52px;font-weight:200;letter-spacing:-2px;font-variant-numeric:tabular-nums;color:#1C1916;transition:color .4s;line-height:1}',
+        '#pp{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#B5B0A4}',
+        'body.w1{background:#FDF0EE}',
+        'body.w2{background:#FAE4E0;animation:bl 1s ease-in-out infinite}',
+        'body.w3{background:#F8D8D2;animation:bl .4s ease-in-out infinite}',
+        '@keyframes bl{0%,100%{opacity:1}50%{opacity:.6}}',
+        '@keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}',
+        '.shaking{animation:sh .08s ease-in-out infinite}'
+      ].join('');
+      w.document.head.appendChild(style);
+      var ph = w.document.createElement('div'); ph.id = 'pp'; ph.textContent = '준비';
+      var td = w.document.createElement('div'); td.id = 'pt'; td.textContent = el('tdisp').textContent;
+      w.document.body.appendChild(ph);
+      w.document.body.appendChild(td);
+      // sync loop
+      pipIv = setInterval(function() {
+        if (!pipWin || pipWin.closed) { clearInterval(pipIv); el('pip-btn').textContent = '미니창'; pipWin = null; return; }
+        var ptd = pipWin.document.getElementById('pt');
+        var pph = pipWin.document.getElementById('pp');
+        if (!ptd || !pph) return;
+        ptd.textContent = el('tdisp').textContent;
+        ptd.style.color  = el('tdisp').style.color || '#1C1916';
+        pph.textContent  = el('phase').textContent;
+        pph.style.color  = el('phase').style.color || '#B5B0A4';
+        // warning class sync
+        var b = pipWin.document.body;
+        b.classList.remove('w1','w2','w3');
+        ptd.classList.remove('shaking');
+        if (document.body.classList.contains('warn3')) { b.classList.add('w3'); ptd.classList.add('shaking'); }
+        else if (document.body.classList.contains('warn2')) b.classList.add('w2');
+        else if (document.body.classList.contains('warn1')) b.classList.add('w1');
+      }, 500);
+      w.addEventListener('pagehide', function() {
+        clearInterval(pipIv); pipWin = null; el('pip-btn').textContent = '미니창';
+      });
+    }).catch(function(e) { alert('미니창을 열 수 없어요.\n크롬 116 이상에서 지원됩니다.'); });
+  } else {
+    alert('이 브라우저는 미니창을 지원하지 않아요.\n크롬 116 이상을 사용해주세요.');
+  }
 }
 
 // ── INIT ────────────────────────────────────────────────────
