@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="크로키">
+<meta name="theme-color" content="#F7F4EE">
+<title>크로키 타이머</title>
+<style>
+:root {
+  --bg:#F7F4EE; --surf:#EDEAE2; --bd:#D8D4C8; --bd2:#C4BFB0;
+  --tx:#1C1916; --tx2:#7A756C; --tx3:#B5B0A4; --ink:#3A3530;
+  --gold:#9A6F38; --gold2:#C49048;
+  --green:#2E8055; --red:#C43030; --amber:#C86820;
+  --r:12px; --rs:8px;
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+
+/* Warning effect via body class — NO fixed overlay so buttons are never blocked */
+body {
+  display:flex; flex-direction:column; align-items:center;
+  min-height:100%; background:var(--bg); color:var(--tx);
+  font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;
+  padding-top:env(safe-area-inset-top,0);
+  padding-bottom:env(safe-area-inset-bottom,16px);
+  transition:background-color 0.6s;
+}
+body.warn1 { background:#FDF0EE; }
+body.warn2 { background:#FAE4E0; animation:bgblink 1s ease-in-out infinite; }
+body.warn3 { background:#F8D8D2; animation:bgblink 0.4s ease-in-out infinite; }
+@keyframes bgblink { 0%,100%{opacity:1} 50%{opacity:0.7} }
+
+html { height:100%; background:var(--bg); }
+
+/* ── HEADER ── */
+.hdr { width:100%; max-width:480px; display:flex; align-items:center; justify-content:space-between; padding:18px 24px 0; }
+.logo { font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--tx3); }
+.fs-btn { background:none; border:1px solid var(--bd); border-radius:6px; color:var(--tx3); font-size:11px; padding:5px 10px; cursor:pointer; font-family:inherit; transition:all .2s; }
+.fs-btn:hover { border-color:var(--bd2); color:var(--tx2); }
+
+/* ── MAIN ── */
+.main { width:100%; max-width:480px; padding:0 24px; flex:1; display:flex; flex-direction:column; }
+
+/* ── PHASE ── */
+.phase { text-align:center; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--tx3); margin:16px 0 4px; height:16px; transition:color .4s; }
+
+/* ── RING ── */
+.rw { position:relative; display:flex; justify-content:center; margin:4px 0; }
+.rc { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; pointer-events:none; }
+#tdisp { font-size:64px; font-weight:200; line-height:1; letter-spacing:-3px; font-variant-numeric:tabular-nums; color:var(--tx); transition:color .4s; }
+#slbl { font-size:12px; color:var(--tx3); margin-top:8px; letter-spacing:.06em; }
+@keyframes numshake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+.shaking { animation:numshake .08s ease-in-out infinite; }
+
+/* ── DECREASE PREVIEW ── */
+#dec-preview { text-align:center; font-size:11px; color:var(--tx3); margin:2px 0 0; min-height:14px; }
+
+/* ── SESSION DOTS ── */
+.dots { display:flex; justify-content:center; flex-wrap:wrap; gap:6px; margin:8px 0 6px; min-height:10px; }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--bd); transition:all .25s; }
+.dot.done { background:var(--gold); }
+.dot.cur  { background:var(--ink); transform:scale(1.55); }
+.dot.rst  { background:var(--green); transform:scale(1.55); }
+
+/* ── CONTROLS ── */
+.ctrl { display:flex; gap:10px; justify-content:center; margin:12px 0; position:relative; z-index:1; }
+.btn { background:none; border:1px solid var(--bd2); border-radius:var(--rs); color:var(--tx2); font-size:14px; padding:11px 20px; cursor:pointer; font-family:inherit; transition:border-color .2s, color .2s; min-width:80px; }
+.btn:hover { border-color:var(--ink); color:var(--tx); }
+.btn:active { opacity:.75; }
+.btn.pri { border-color:var(--gold); color:var(--gold); min-width:110px; }
+.btn.pri:hover { background:rgba(154,111,56,.07); }
+
+/* ── TABS ── */
+.tbar { display:flex; border-bottom:1px solid var(--bd); margin-top:8px; }
+.tb { flex:1; background:none; border:none; border-bottom:2px solid transparent; padding:10px 4px; font-size:12px; color:var(--tx3); cursor:pointer; font-family:inherit; transition:all .2s; }
+.tb.on { color:var(--ink); border-bottom-color:var(--ink); font-weight:500; }
+.tb:hover:not(.on) { color:var(--tx2); }
+.pane { display:none; padding:18px 0 24px; }
+.pane.show { display:block; }
+
+/* ── SETTINGS ── */
+.sr { margin-bottom:18px; }
+.sh { display:flex; justify-content:space-between; align-items:center; margin-bottom:9px; }
+.sn { font-size:13px; color:var(--tx2); }
+.sv { font-size:13px; font-weight:500; color:var(--ink); }
+input[type=range] { -webkit-appearance:none; width:100%; height:2px; background:var(--bd2); border-radius:2px; outline:none; cursor:pointer; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:var(--ink); cursor:pointer; }
+.seg { display:flex; border:1px solid var(--bd2); border-radius:var(--rs); overflow:hidden; }
+.sg { flex:1; background:none; border:none; border-right:1px solid var(--bd); padding:8px 4px; font-size:12px; color:var(--tx2); cursor:pointer; font-family:inherit; transition:all .15s; }
+.sg:last-child { border-right:none; }
+.sg.on { background:var(--ink); color:var(--bg); font-weight:500; }
+.mode-box { background:var(--surf); border-radius:var(--rs); padding:10px 12px; margin-top:8px; font-size:12px; color:var(--tx2); line-height:1.6; }
+.mode-box strong { color:var(--ink); font-weight:500; }
+
+/* ── PRESETS ── */
+.stitle { font-size:11px; color:var(--tx3); letter-spacing:.08em; text-transform:uppercase; margin-bottom:10px; }
+.qgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+.qc { background:var(--surf); border:1px solid var(--bd); border-radius:var(--rs); padding:11px 8px; text-align:center; cursor:pointer; transition:all .2s; }
+.qc:hover { border-color:var(--bd2); }
+.qc:active { opacity:.75; }
+.qn { font-size:12px; font-weight:500; color:var(--tx); margin-bottom:3px; }
+.qd { font-size:10px; color:var(--tx3); }
+.psl { display:flex; align-items:center; gap:8px; border:1px solid var(--bd); border-radius:var(--rs); padding:11px 13px; margin-bottom:8px; }
+.psl .pi { flex:1; }
+.psl .pn { font-size:13px; font-weight:500; }
+.psl .pd { font-size:11px; color:var(--tx3); margin-top:3px; }
+.psl .pa { display:flex; gap:6px; }
+.psl .pa .btn { font-size:11px; padding:5px 10px; min-width:unset; }
+.empty { font-size:13px; color:var(--tx3); text-align:center; padding:16px 0; }
+
+/* ── RECORDS ── */
+.rcards { display:flex; gap:8px; margin-bottom:16px; }
+.rcard { flex:1; background:var(--surf); border:1px solid var(--bd); border-radius:var(--rs); padding:12px 8px; text-align:center; }
+.rnum { font-size:22px; font-weight:300; letter-spacing:-1px; }
+.rlbl { font-size:10px; color:var(--tx3); margin-top:3px; }
+.wbars { display:flex; align-items:flex-end; gap:4px; height:60px; margin-bottom:6px; }
+.bw { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+.bar { width:100%; background:var(--bd); border-radius:3px; min-height:4px; }
+.bar.td { background:var(--ink); }
+.wlbls { display:flex; gap:4px; }
+.wl { flex:1; text-align:center; font-size:10px; color:var(--tx3); }
+.wl.td { color:var(--ink); font-weight:500; }
+
+/* ── COMPLETION ── */
+#comp { display:none; padding:3rem 0 2rem; text-align:center; }
+#comp.show { display:block; }
+#cfw { position:relative; height:60px; margin-bottom:1.5rem; overflow:hidden; }
+.cdot { position:absolute; width:8px; height:8px; border-radius:50%; animation:fall 2s ease-in infinite; }
+@keyframes fall { 0%{transform:translateY(-10px) rotate(0);opacity:1} 100%{transform:translateY(60px) rotate(360deg);opacity:0} }
+.comp-t { font-size:32px; font-weight:200; letter-spacing:-1px; margin-bottom:6px; }
+.comp-s { font-size:14px; color:var(--tx2); margin-bottom:1.5rem; }
+.cstats { display:flex; gap:24px; justify-content:center; margin-bottom:1.5rem; }
+.cs { text-align:center; }
+.csn { font-size:28px; font-weight:200; color:var(--gold); letter-spacing:-1px; }
+.csl { font-size:11px; color:var(--tx3); margin-top:3px; }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <span class="logo">Croquis</span>
+  <button class="fs-btn" onclick="toggleFS()">전체화면</button>
+</div>
+
+<div class="main">
+  <div class="phase" id="phase">준비</div>
+
+  <div class="rw">
+    <svg width="220" height="220" viewBox="0 0 220 220" style="display:block">
+      <circle cx="110" cy="110" r="96" fill="none" stroke="#D8D4C8" stroke-width="4"/>
+      <circle id="ring" cx="110" cy="110" r="96" fill="none" stroke-width="4"
+        stroke-linecap="round" transform="rotate(-90 110 110)"
+        stroke-dasharray="603.19" stroke-dashoffset="0"/>
+    </svg>
+    <div class="rc">
+      <div id="tdisp">05:00</div>
+      <div id="slbl">세션 1 / 5</div>
+    </div>
+  </div>
+
+  <div id="dec-preview"></div>
+  <div class="dots" id="dots"></div>
+
+  <div class="ctrl">
+    <button class="btn" id="breset" onclick="doReset()">초기화</button>
+    <button class="btn pri" id="bstart" onclick="doToggle()">시작</button>
+  </div>
+
+  <div class="tbar">
+    <button class="tb on" onclick="goTab('settings',this)">설정</button>
+    <button class="tb" onclick="goTab('presets',this)">프리셋</button>
+    <button class="tb" onclick="goTab('records',this)">기록</button>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div id="tab-settings" class="pane show">
+    <div class="sr">
+      <div class="sh"><span class="sn">크로키 시간</span><span class="sv" id="vdraw">2분</span></div>
+      <input type="range" id="sldraw" min="60" max="600" step="10" value="300" oninput="onDraw(+this.value)">
+    </div>
+    <div class="sr">
+      <div class="sh"><span class="sn">휴식 시간</span><span class="sv" id="vrest">10초</span></div>
+      <input type="range" id="slrest" min="0" max="30" step="5" value="10" oninput="onRest(+this.value)">
+    </div>
+    <div class="sr">
+      <div class="sh"><span class="sn">반복 횟수</span><span class="sv" id="vrep">5회</span></div>
+      <input type="range" id="slrep" min="1" max="10" step="1" value="5" oninput="onRep(+this.value)">
+    </div>
+    <div class="sr">
+      <div class="sh" style="margin-bottom:9px"><span class="sn">타이머 모드</span></div>
+      <div class="seg" id="mode-seg">
+        <button class="sg on" onclick="setMode('normal',this)">일반</button>
+        <button class="sg" onclick="setMode('decrease',this)">체감</button>
+      </div>
+      <div class="mode-box" id="mbox">매 세션 <strong>동일한 시간</strong>으로 반복합니다.</div>
+    </div>
+    <div class="sr" style="margin-bottom:0">
+      <div class="sh" style="margin-bottom:9px"><span class="sn">알람 음색</span></div>
+      <div class="seg" id="alarm-seg">
+        <button class="sg on" onclick="setAlarm('beep',this)">비프</button>
+        <button class="sg" onclick="setAlarm('bell',this)">벨</button>
+        <button class="sg" onclick="setAlarm('wood',this)">목탁</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRESETS TAB -->
+  <div id="tab-presets" class="pane">
+    <div class="stitle">빠른 프리셋</div>
+    <div class="qgrid">
+      <div class="qc" onclick="applyQ(30,5,10,'normal')"><div class="qn">속사</div><div class="qd">30초·5초·10회</div></div>
+      <div class="qc" onclick="applyQ(120,10,5,'normal')"><div class="qn">기본</div><div class="qd">2분·10초·5회</div></div>
+      <div class="qc" onclick="applyQ(300,15,5,'decrease')"><div class="qn">체감</div><div class="qd">5→2.5분·5회</div></div>
+      <div class="qc" onclick="applyQ(600,30,5,'normal')"><div class="qn">디테일</div><div class="qd">10분·30초·5회</div></div>
+      <div class="qc" onclick="applyQ(180,10,6,'decrease')"><div class="qn">단축</div><div class="qd">3→1.5분·6회</div></div>
+      <div class="qc" onclick="applyQ(60,0,8,'normal')"><div class="qn">집중</div><div class="qd">1분·휴식없음·8회</div></div>
+    </div>
+    <div class="stitle">저장된 프리셋</div>
+    <div id="myp"></div>
+    <button class="btn" onclick="doSave()" style="width:100%;margin-top:4px">현재 설정 저장 +</button>
+  </div>
+
+  <!-- RECORDS TAB -->
+  <div id="tab-records" class="pane">
+    <div class="stitle">오늘</div>
+    <div class="rcards">
+      <div class="rcard"><div class="rnum" id="rss">0</div><div class="rlbl">완료 세션</div></div>
+      <div class="rcard"><div class="rnum" id="rtm">00:00</div><div class="rlbl">드로잉 시간</div></div>
+      <div class="rcard"><div class="rnum" id="rst">0</div><div class="rlbl">완료 세트</div></div>
+    </div>
+    <div class="stitle">이번 주</div>
+    <div class="wbars" id="wbars"></div>
+    <div class="wlbls" id="wlbls"></div>
+  </div>
+
+  <!-- COMPLETION (normal flow, no fixed overlay) -->
+  <div id="comp">
+    <div id="cfw"></div>
+    <div class="comp-t">세트 완료</div>
+    <div class="comp-s">수고했어요</div>
+    <div class="cstats">
+      <div class="cs"><div class="csn" id="cs-sess">0</div><div class="csl">세션</div></div>
+      <div class="cs"><div class="csn" id="cs-time">0:00</div><div class="csl">드로잉</div></div>
+      <div class="cs"><div class="csn" id="cs-sets">0</div><div class="csl">누적 세트</div></div>
+    </div>
+    <button class="btn pri" onclick="doReset()">다시 시작</button>
+  </div>
+</div>
+
+<script>
+// ── PWA ─────────────────────────────────────────────────────
+(function() {
+  try {
+    var m = { name:"크로키 타이머", short_name:"크로키", start_url:".", display:"standalone", background_color:"#F7F4EE", theme_color:"#F7F4EE",
+      icons:[{ src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="40" fill="#F7F4EE"/><circle cx="96" cy="96" r="58" fill="none" stroke="#9A6F38" stroke-width="7"/><text x="96" y="108" text-anchor="middle" fill="#1C1916" font-size="32" font-family="Helvetica" font-weight="200">CR</text></svg>'), sizes:"192x192", type:"image/svg+xml" }]
+    };
+    var lk = document.createElement('link');
+    lk.rel = 'manifest';
+    lk.href = URL.createObjectURL(new Blob([JSON.stringify(m)], {type:'application/json'}));
+    document.head.appendChild(lk);
+    if ('serviceWorker' in navigator) {
+      var sw = "const K='cq1';self.addEventListener('install',e=>e.waitUntil(caches.open(K).then(c=>c.addAll(['.']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));";
+      navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type:'text/javascript'}))).catch(function(){});
+    }
+  } catch(e) {}
+})();
+
+var deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) { e.preventDefault(); deferredPrompt = e; });
+
+function toggleFS() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){});
+  else document.exitFullscreen();
+}
+
+// ── CONSTANTS ───────────────────────────────────────────────
+var CIRC = 603.19; // 2 * pi * 96
+
+// ── TIMER INTERVAL (window-level, zero ambiguity) ───────────
+window.CQ_TID = null;
+
+function timerStop() {
+  if (window.CQ_TID !== null) {
+    window.clearInterval(window.CQ_TID);
+    window.CQ_TID = null;
+  }
+}
+function timerStart() {
+  timerStop(); // always clear first
+  window.CQ_TID = window.setInterval(tick, 1000);
+}
+
+// ── CONFIG (never reassigned, only mutated) ─────────────────
+var cfg = { draw:300, rest:10, rep:5, mode:'normal', alarm:'beep' };
+
+// ── RUNTIME (never reassigned, only mutated) ────────────────
+var rt = { running:false, resting:false, phase:'idle', cur:300, tot:300, idx:0, warned:false, stimes:[] };
+
+// ── SESSION STATS ───────────────────────────────────────────
+var st = { done:0, drawn:0, sets:0 };
+
+// ── AUDIO ───────────────────────────────────────────────────
+var audioCtx = null;
+function getAC() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function beep(freq, delay, dur, vol, type) {
+  type = type || 'sine';
+  try {
+    var ac = getAC();
+    var o = ac.createOscillator();
+    var g = ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.type = type; o.frequency.value = freq;
+    var t = ac.currentTime + delay;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.start(t); o.stop(t + dur);
+  } catch(e) {}
+}
+function playAlarm(ev) {
+  var a = cfg.alarm;
+  if (ev === 'warn') {
+    if (a === 'beep') { beep(880,0,.12,.18); beep(880,.22,.12,.18); beep(880,.44,.12,.18); }
+    else if (a === 'bell') { beep(1047,0,.35,.14); beep(1047,.25,.35,.14); beep(1047,.5,.35,.14); }
+    else { beep(350,0,.08,.28,'triangle'); beep(350,.2,.08,.28,'triangle'); beep(350,.4,.08,.28,'triangle'); }
+  } else if (ev === 'end') {
+    if (a === 'beep') { beep(880,0,.3,.23); beep(698,.18,.3,.23); beep(523,.36,.3,.23); }
+    else if (a === 'bell') { beep(1047,0,.6,.18); beep(784,.22,.6,.18); beep(523,.44,.6,.18); }
+    else { beep(400,0,.1,.32,'triangle'); beep(300,.15,.1,.32,'triangle'); beep(220,.3,.1,.32,'triangle'); }
+  } else if (ev === 'go') {
+    if (a === 'beep') { beep(523,0,.25,.2); beep(659,.15,.25,.2); beep(784,.3,.25,.2); beep(1047,.45,.25,.2); }
+    else if (a === 'bell') { beep(523,0,.5,.16); beep(784,.2,.5,.16); beep(1047,.4,.5,.16); beep(1318,.6,.5,.16); }
+    else { beep(220,0,.08,.3,'triangle'); beep(300,.12,.08,.3,'triangle'); beep(400,.24,.08,.3,'triangle'); beep(500,.36,.08,.3,'triangle'); }
+  } else if (ev === 'done') {
+    beep(523,0,.6,.18); beep(659,.15,.6,.18); beep(784,.3,.6,.18); beep(1047,.45,.6,.18); beep(1319,.6,.6,.18);
+  }
+}
+
+// ── UTILS ───────────────────────────────────────────────────
+function fmt(s) {
+  return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+}
+function fmtL(s) {
+  var m = Math.floor(s/60), sec = s%60;
+  if (!m) return sec+'초';
+  if (!sec) return m+'분';
+  return m+'분 '+sec+'초';
+}
+function dayKey(off) {
+  off = off || 0;
+  var d = new Date(); d.setDate(d.getDate()-off);
+  return 'cq_'+d.getFullYear()+'_'+d.getMonth()+'_'+d.getDate();
+}
+function el(id) { return document.getElementById(id); }
+
+// ── SESSION TIME ─────────────────────────────────────────────
+function sessionTime(i) {
+  if (cfg.mode === 'decrease') {
+    var mn = Math.max(30, Math.floor(cfg.draw/2));
+    var step = cfg.rep > 1 ? Math.round((cfg.draw-mn)/(cfg.rep-1)/10)*10 : 0;
+    return Math.max(mn, cfg.draw - i*step);
+  }
+  return cfg.draw;
+}
+
+function updateDecPreview() {
+  var dp = el('dec-preview');
+  if (cfg.mode === 'decrease' && cfg.rep > 1) {
+    var times = [];
+    for (var i = 0; i < Math.min(cfg.rep, 4); i++) times.push(fmtL(sessionTime(i)));
+    if (cfg.rep > 4) times.push('...');
+    dp.textContent = times.join(' → ');
+  } else {
+    dp.textContent = '';
+  }
+}
+
+// ── WARNING EFFECT (via body class — no fixed overlay) ───────
+function updateWarn() {
+  var b = document.body;
+  b.classList.remove('warn1','warn2','warn3');
+  el('tdisp').classList.remove('shaking');
+  if (!rt.running || rt.resting) return;
+  var pct = rt.cur / rt.tot;
+  if (pct < 0.07) { b.classList.add('warn3'); el('tdisp').classList.add('shaking'); }
+  else if (pct < 0.15) { b.classList.add('warn2'); }
+  else if (pct < 0.3)  { b.classList.add('warn1'); }
+}
+
+// ── RING COLOR ───────────────────────────────────────────────
+function ringColor() {
+  if (!rt.running) return '#9A6F38';
+  if (rt.resting)  return '#2E8055';
+  var pct = rt.cur / rt.tot;
+  if (pct < 0.07) return '#C43030';
+  if (pct < 0.15) return '#C86820';
+  if (pct < 0.3)  return '#C49048';
+  return '#3A3530';
+}
+
+// ── RENDER ──────────────────────────────────────────────────
+function renderDots() {
+  var d = el('dots'); d.innerHTML = '';
+  for (var i = 0; i < cfg.rep; i++) {
+    var e = document.createElement('div');
+    var cls = 'dot';
+    if (i < st.done) cls += ' done';
+    else if (i === rt.idx && rt.running && !rt.resting) cls += ' cur';
+    else if (i === rt.idx && rt.resting) cls += ' rst';
+    e.className = cls;
+    d.appendChild(e);
+  }
+}
+
+function render() {
+  el('tdisp').textContent = fmt(rt.cur);
+
+  var ring = el('ring');
+  var off = CIRC * (1 - rt.cur / (rt.tot || 1));
+  ring.setAttribute('stroke-dashoffset', String(off));
+  ring.setAttribute('stroke', ringColor());
+
+  var pct = (rt.running && !rt.resting) ? rt.cur/rt.tot : 1;
+  el('tdisp').style.color = pct < 0.07 ? '#C43030' : pct < 0.15 ? '#C86820' : '#1C1916';
+
+  var ph = el('phase');
+  if (rt.resting) { ph.textContent = '휴식'; ph.style.color = '#2E8055'; }
+  else if (rt.running) { ph.textContent = '크로키 중'; ph.style.color = '#9A6F38'; }
+  else { ph.textContent = '준비'; ph.style.color = '#B5B0A4'; }
+
+  el('slbl').textContent = '세션 ' + (rt.idx+1) + ' / ' + cfg.rep;
+
+  updateWarn();
+  renderDots();
+  renderRec();
+}
+
+// ── TICK ────────────────────────────────────────────────────
+function tick() {
+  rt.cur--;
+  if (!rt.warned && rt.cur === 10 && !rt.resting) {
+    playAlarm('warn'); rt.warned = true;
+  }
+  if (rt.cur <= 0) {
+    if (!rt.resting) {
+      st.done++;
+      st.drawn += (rt.stimes[rt.idx] || cfg.draw);
+      saveRec();
+      playAlarm('end');
+      if (rt.idx + 1 >= cfg.rep) {
+        // All sessions complete
+        st.sets++;
+        timerStop();
+        rt.running = false;
+        playAlarm('done');
+        renderDots();
+        renderRec();
+        showComp();
+        return;
+      }
+      if (cfg.rest > 0) {
+        rt.resting = true; rt.tot = cfg.rest; rt.cur = cfg.rest;
+      } else {
+        rt.idx++; rt.warned = false;
+        var t = sessionTime(rt.idx); rt.stimes[rt.idx] = t; rt.tot = t; rt.cur = t;
+      }
+    } else {
+      rt.resting = false; rt.idx++; rt.warned = false;
+      playAlarm('go');
+      var t2 = sessionTime(rt.idx); rt.stimes[rt.idx] = t2; rt.tot = t2; rt.cur = t2;
+    }
+  }
+  render();
+}
+
+// ── PUBLIC CONTROLS ─────────────────────────────────────────
+function doToggle() {
+  if (rt.running) {
+    // PAUSE
+    timerStop();
+    rt.running = false;
+    el('bstart').textContent = '계속';
+    el('tdisp').classList.remove('shaking');
+    document.body.classList.remove('warn1','warn2','warn3');
+  } else {
+    // START / RESUME
+    if (rt.phase === 'idle') {
+      rt.phase = 'drawing';
+      rt.idx = 0;
+      rt.stimes = [];
+      var t = sessionTime(0); rt.stimes[0] = t; rt.cur = t; rt.tot = t;
+    }
+    rt.running = true;
+    el('bstart').textContent = '일시정지';
+    lockSett();
+    timerStart();
+  }
+  render();
+}
+
+function doReset() {
+  // 1. Stop any running interval — use window.CQ_TID directly
+  if (window.CQ_TID !== null) {
+    window.clearInterval(window.CQ_TID);
+    window.CQ_TID = null;
+  }
+
+  // 2. Reset runtime state (mutate, never reassign rt)
+  rt.running = false;
+  rt.resting = false;
+  rt.phase   = 'idle';
+  rt.cur     = cfg.draw;
+  rt.tot     = cfg.draw;
+  rt.idx     = 0;
+  rt.warned  = false;
+  rt.stimes  = [];
+
+  // 3. Reset session stats
+  st.done  = 0;
+  st.drawn = 0;
+  st.sets  = 0;
+
+  // 4. Reset UI chrome
+  el('bstart').textContent = '시작';
+  el('tdisp').classList.remove('shaking');
+  document.body.classList.remove('warn1','warn2','warn3');
+  el('comp').classList.remove('show');
+
+  // 5. Unlock settings
+  unlockSett();
+
+  // 6. Re-render
+  render();
+}
+
+function lockSett() {
+  var s = el('tab-settings');
+  s.style.opacity = '0.3';
+  s.style.pointerEvents = 'none';
+}
+function unlockSett() {
+  var s = el('tab-settings');
+  s.style.opacity = '1';
+  s.style.pointerEvents = 'auto';
+}
+
+// ── COMPLETION ──────────────────────────────────────────────
+function showComp() {
+  el('cs-sess').textContent = st.done;
+  el('cs-time').textContent = fmt(st.drawn);
+  el('cs-sets').textContent = st.sets;
+  var cfw = el('cfw'); cfw.innerHTML = '';
+  var cols = ['#9A6F38','#2E8055','#378ADD','#C86820','#9A3060','#6A5090'];
+  for (var i = 0; i < 24; i++) {
+    var d = document.createElement('div'); d.className = 'cdot';
+    d.style.left = Math.round(Math.random()*92) + '%';
+    d.style.background = cols[i % cols.length];
+    d.style.animationDelay = (Math.random()*1.5).toFixed(2) + 's';
+    d.style.animationDuration = (1.4 + Math.random()*0.8).toFixed(2) + 's';
+    cfw.appendChild(d);
+  }
+  el('comp').classList.add('show');
+  unlockSett();
+}
+
+// ── SETTINGS HANDLERS ───────────────────────────────────────
+function onDraw(v) {
+  cfg.draw = v; el('vdraw').textContent = fmtL(v);
+  if (!rt.running && rt.phase === 'idle') { rt.cur = v; rt.tot = v; render(); }
+  updateDecPreview();
+}
+function onRest(v) { cfg.rest = v; el('vrest').textContent = v === 0 ? '없음' : v+'초'; }
+function onRep(v) {
+  cfg.rep = v; el('vrep').textContent = v+'회';
+  if (!rt.running) render();
+  updateDecPreview();
+}
+function setMode(m, btn) {
+  cfg.mode = m;
+  el('mode-seg').querySelectorAll('.sg').forEach(function(b) { b.classList.remove('on'); });
+  btn.classList.add('on');
+  el('mbox').innerHTML = m === 'decrease'
+    ? '매 세션마다 시간이 <strong>자동으로 줄어듭니다.</strong><br>설정값 → 설정값의 50%까지 균등 감소'
+    : '매 세션 <strong>동일한 시간</strong>으로 반복합니다.';
+  updateDecPreview();
+  if (!rt.running) render();
+}
+function setAlarm(a, btn) {
+  cfg.alarm = a;
+  el('alarm-seg').querySelectorAll('.sg').forEach(function(b) { b.classList.remove('on'); });
+  btn.classList.add('on');
+  playAlarm('go');
+}
+
+// ── TABS ────────────────────────────────────────────────────
+function goTab(n, btn) {
+  document.querySelectorAll('.pane').forEach(function(p) { p.classList.remove('show'); });
+  document.querySelectorAll('.tb').forEach(function(b) { b.classList.remove('on'); });
+  el('tab-'+n).classList.add('show'); btn.classList.add('on');
+  if (n === 'records') renderRec();
+  if (n === 'presets') renderPresets();
+}
+
+// ── PRESETS ─────────────────────────────────────────────────
+var uPresets = [];
+function loadP() { try { return JSON.parse(localStorage.getItem('cq_presets') || '[]'); } catch(e) { return []; } }
+function saveP(p) { try { localStorage.setItem('cq_presets', JSON.stringify(p)); } catch(e) {} }
+
+function applyQ(draw, rest, rep, mode) {
+  cfg.draw = draw; cfg.rest = rest; cfg.rep = rep; cfg.mode = mode;
+  el('sldraw').value = draw; el('slrest').value = rest; el('slrep').value = rep;
+  el('vdraw').textContent = fmtL(draw);
+  el('vrest').textContent = rest === 0 ? '없음' : rest+'초';
+  el('vrep').textContent  = rep+'회';
+  el('mode-seg').querySelectorAll('.sg').forEach(function(b, i) {
+    b.classList.toggle('on', ['normal','decrease'][i] === mode);
+  });
+  el('mbox').innerHTML = mode === 'decrease'
+    ? '매 세션마다 시간이 <strong>자동으로 줄어듭니다.</strong><br>설정값 → 설정값의 50%까지 균등 감소'
+    : '매 세션 <strong>동일한 시간</strong>으로 반복합니다.';
+  if (!rt.running && rt.phase === 'idle') { rt.cur = draw; rt.tot = draw; }
+  updateDecPreview(); render();
+  goTab('settings', document.querySelector('.tb'));
+}
+function doSave() {
+  var ps = loadP(); if (ps.length >= 5) ps.shift();
+  ps.push({ draw:cfg.draw, rest:cfg.rest, rep:cfg.rep, mode:cfg.mode });
+  saveP(ps); renderPresets();
+}
+function renderPresets() {
+  uPresets = loadP(); var w = el('myp'); w.innerHTML = '';
+  if (!uPresets.length) { w.innerHTML = '<div class="empty">저장된 프리셋 없음</div>'; return; }
+  uPresets.forEach(function(p, i) {
+    var d = document.createElement('div'); d.className = 'psl';
+    d.innerHTML = '<div class="pi"><div class="pn">'+fmtL(p.draw)+' · '+p.rep+'회</div>'
+      +'<div class="pd">휴식 '+(p.rest===0?'없음':p.rest+'초')+' · '+(p.mode==='decrease'?'체감':'일반')+' 모드</div></div>'
+      +'<div class="pa"><button class="btn" onclick="applySlot('+i+')">적용</button>'
+      +'<button class="btn" onclick="delSlot('+i+')">삭제</button></div>';
+    w.appendChild(d);
+  });
+}
+function applySlot(i) { var p = uPresets[i]; if (p) applyQ(p.draw, p.rest, p.rep, p.mode || 'normal'); }
+function delSlot(i) { var ps = loadP(); ps.splice(i, 1); saveP(ps); renderPresets(); }
+
+// ── RECORDS ─────────────────────────────────────────────────
+function saveRec() {
+  try {
+    var k = dayKey(), r = JSON.parse(localStorage.getItem(k) || '{"s":0,"t":0}');
+    r.s = (r.s||0) + 1;
+    r.t = (r.t||0) + (rt.stimes[rt.idx] || cfg.draw);
+    localStorage.setItem(k, JSON.stringify(r));
+  } catch(e) {}
+}
+function renderRec() {
+  try {
+    var r = JSON.parse(localStorage.getItem(dayKey()) || '{"s":0,"t":0}');
+    if (el('rss')) el('rss').textContent = r.s || 0;
+    if (el('rtm')) el('rtm').textContent = fmt(r.t || 0);
+    if (el('rst')) el('rst').textContent = Math.floor((r.s||0) / cfg.rep);
+  } catch(e) {}
+  var wb = el('wbars'), wl = el('wlbls');
+  if (!wb || !wl) return;
+  wb.innerHTML = ''; wl.innerHTML = '';
+  var dn = new Date().getDay();
+  var days = ['일','월','화','수','목','금','토'];
+  var vals = [];
+  for (var i = 6; i >= 0; i--) {
+    try { var rec = JSON.parse(localStorage.getItem(dayKey(i)) || '{}'); vals.push(rec.t || 0); }
+    catch(e) { vals.push(0); }
+  }
+  var mx = Math.max.apply(null, vals.concat([1]));
+  vals.forEach(function(t, i) {
+    var isToday = (i === 6);
+    var h = Math.max(4, Math.round(t/mx*52));
+    var bw = document.createElement('div'); bw.className = 'bw';
+    bw.innerHTML = '<div class="bar'+(isToday?' td':'')+'" style="height:'+h+'px"></div>';
+    wb.appendChild(bw);
+    var lw = document.createElement('div'); lw.className = 'wl'+(isToday?' td':'');
+    lw.textContent = days[(dn-6+i+7)%7];
+    wl.appendChild(lw);
+  });
+}
+
+// ── INIT ────────────────────────────────────────────────────
+el('vdraw').textContent = fmtL(cfg.draw);
+el('vrest').textContent = cfg.rest+'초';
+el('vrep').textContent  = cfg.rep+'회';
+render();
+renderRec();
+renderPresets();
+</script>
+</body>
+</html>
